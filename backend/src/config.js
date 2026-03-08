@@ -9,6 +9,7 @@ export const config = {
     clientId: process.env.EBAY_CLIENT_ID,
     clientSecret: process.env.EBAY_CLIENT_SECRET,
     redirectUri: process.env.EBAY_REDIRECT_URI || 'http://localhost:5050/api/ebay/callback',
+    ruName: process.env.EBAY_RU_NAME,
     env: process.env.EBAY_ENV || 'production',
     get baseUrl() {
       return this.env === 'sandbox'
