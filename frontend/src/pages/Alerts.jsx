@@ -1,116 +1,79 @@
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { api } from '../lib/api'
-import { Bell, Plus, Trash2, ToggleLeft, ToggleRight, Clock } from 'lucide-react'
-import { format, parseISO } from 'date-fns'
-
-const CONDITIONS = [
-  { value: 'negative_feedback', label: 'Negative feedback received' },
-  { value: 'neutral_feedback', label: 'Neutral feedback received' },
-]
 
 export default function Alerts() {
   const [rules, setRules] = useState([])
   const [logs, setLogs] = useState([])
   const [name, setName] = useState('')
   const [condition, setCondition] = useState('negative_feedback')
-  const [notifyEmail, setNotifyEmail] = useState(true)
-  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  const load = async () => {
-    const [r, l] = await Promise.all([api.getAlertRules(), api.getAlertLogs()])
-    setRules(r)
-    setLogs(l)
-  }
   useEffect(() => { load() }, [])
-
-  const create = async () => {
-    if (!name.trim()) return setError('Name is required')
+  async function load() {
     try {
-      const rule = await api.createAlertRule({ name, condition, notify_email: notifyEmail })
-      setRules(prev => [rule, ...prev])
-      setName('')
-      setError('')
-    } catch (e) { setError(e.response?.data?.error || 'Failed') }
+      const [r, l] = await Promise.all([api.getAlertRules(), api.getAlertLogs()])
+      setRules(r.rules || []); setLogs(l.logs || [])
+    } catch {}
   }
 
-  const toggle = async (rule) => {
-    const updated = await api.updateAlertRule(rule.id, { enabled: !rule.enabled })
-    setRules(prev => prev.map(r => r.id === updated.id ? updated : r))
+  async function handleCreate() {
+    if (!name) return
+    setLoading(true)
+    try { await api.createAlertRule({ name, condition, notify_email: true }); setName(''); await load() }
+    catch (e) { alert(e?.response?.data?.message || 'Failed') }
+    setLoading(false)
   }
 
-  const remove = async (id) => {
-    await api.deleteAlertRule(id)
-    setRules(prev => prev.filter(r => r.id !== id))
+  async function handleDelete(id) {
+    if (!confirm('Delete this alert?')) return
+    await api.deleteAlertRule(id); await load()
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
-      <h1 className="text-2xl font-bold">Alert Rules</h1>
-
-      <div className="rounded-xl border border-slate-800 bg-slate-900 p-6 space-y-4">
-        <h2 className="text-sm font-semibold text-slate-300">Create New Alert</h2>
-        <div className="grid md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs text-slate-400 mb-1.5">Alert Name</label>
-            <input className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="e.g. Negative feedback alert"
-              value={name} onChange={e => setName(e.target.value)} />
-          </div>
-          <div>
-            <label className="block text-xs text-slate-400 mb-1.5">Condition</label>
-            <select className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              value={condition} onChange={e => setCondition(e.target.value)}>
-              {CONDITIONS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-            </select>
-          </div>
-        </div>
-        <label className="flex items-center gap-2.5 cursor-pointer">
-          <input type="checkbox" className="w-4 h-4 accent-indigo-500" checked={notifyEmail} onChange={e => setNotifyEmail(e.target.checked)} />
-          <span className="text-sm text-slate-300">Send email notification</span>
-        </label>
-        {error && <p className="text-sm text-red-400">{error}</p>}
-        <button onClick={create} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold transition">
-          <Plus size={15} /> Create Alert
+    <div style={{ maxWidth: 480, margin: '0 auto', padding: '16px 16px 80px' }}>
+      <div style={{ background: '#fff', borderRadius: 16, padding: 20, marginBottom: 16, border: '1px solid #f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 14 }}>New Alert Rule</div>
+        <label style={{ color: '#64748b', fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 6 }}>Alert Name</label>
+        <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Negative feedback alert" style={{ width: '100%', padding: '10px 14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, fontSize: 14, boxSizing: 'border-box', outline: 'none', marginBottom: 12, color: '#1e293b' }} />
+        <label style={{ color: '#64748b', fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 6 }}>Condition</label>
+        <select value={condition} onChange={e => setCondition(e.target.value)} style={{ width: '100%', padding: '10px 14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, fontSize: 14, boxSizing: 'border-box', outline: 'none', marginBottom: 16, color: '#1e293b' }}>
+          <option value="negative_feedback">Negative feedback received</option>
+          <option value="neutral_feedback">Neutral feedback received</option>
+        </select>
+        <button onClick={handleCreate} disabled={loading} style={{ width: '100%', padding: '12px', borderRadius: 12, border: 'none', background: '#2563eb', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+          {loading ? '...' : '+ Create Alert'}
         </button>
       </div>
 
-      <div className="space-y-3">
-        {rules.length === 0 && <div className="text-center py-8 text-slate-500 text-sm">No alert rules yet.</div>}
-        {rules.map(rule => (
-          <div key={rule.id} className={`rounded-xl border p-4 flex items-center justify-between gap-4 ${rule.enabled ? 'border-slate-700 bg-slate-900' : 'border-slate-800 bg-slate-900/50 opacity-60'}`}>
-            <div className="flex items-center gap-3">
-              <Bell size={16} className={rule.enabled ? 'text-indigo-400' : 'text-slate-600'} />
+      {rules.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Active Rules</div>
+          {rules.map(r => (
+            <div key={r.id} style={{ background: '#fff', borderRadius: 14, padding: '14px 16px', marginBottom: 10, border: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <div className="text-sm font-medium">{rule.name}</div>
-                <div className="text-xs text-slate-500">{CONDITIONS.find(c => c.value === rule.condition)?.label}</div>
+                <div style={{ fontWeight: 600, fontSize: 14, color: '#1e293b' }}>{r.name}</div>
+                <div style={{ color: '#94a3b8', fontSize: 12, marginTop: 2 }}>{r.condition === 'negative_feedback' ? '🔴 Negative feedback' : '🟡 Neutral feedback'}</div>
               </div>
+              <button onClick={() => handleDelete(r.id)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 20 }}>×</button>
             </div>
-            <div className="flex items-center gap-2">
-              {rule.notify_email && <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400">Email</span>}
-              <button onClick={() => toggle(rule)} className="text-slate-400 hover:text-indigo-400 transition">
-                {rule.enabled ? <ToggleRight size={22} className="text-indigo-400" /> : <ToggleLeft size={22} />}
-              </button>
-              <button onClick={() => remove(rule.id)} className="p-1.5 rounded-md text-slate-600 hover:text-red-400 hover:bg-slate-800 transition"><Trash2 size={14} /></button>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {logs.length > 0 && (
-        <div className="rounded-xl border border-slate-800 bg-slate-900">
-          <div className="px-5 py-4 border-b border-slate-800 flex items-center gap-2">
-            <Clock size={15} className="text-slate-500" />
-            <h2 className="text-sm font-semibold text-slate-300">Alert History</h2>
-          </div>
-          <div className="divide-y divide-slate-800">
-            {logs.map(log => (
-              <div key={log.id} className="px-5 py-3 flex items-center justify-between">
-                <div className="text-sm text-slate-300">{log.message}</div>
-                <div className="text-xs text-slate-600">{format(parseISO(log.triggered_at), 'MMM d, h:mm a')}</div>
-              </div>
-            ))}
-          </div>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Recent Alerts</div>
+          {logs.slice(0, 10).map(l => (
+            <div key={l.id} style={{ background: '#fff', borderRadius: 14, padding: '12px 16px', marginBottom: 8, border: '1px solid #f1f5f9' }}>
+              <div style={{ fontSize: 13, color: '#334155' }}>{l.message}</div>
+              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>{new Date(l.triggered_at).toLocaleDateString()}</div>
+            </div>
+          ))}
         </div>
+      )}
+
+      {rules.length === 0 && logs.length === 0 && (
+        <div style={{ textAlign: 'center', color: '#94a3b8', padding: 40, fontSize: 14 }}>No alerts yet. Create a rule above to get notified.</div>
       )}
     </div>
   )

@@ -14,7 +14,7 @@ export default function Settings() {
 
   async function handleSync() {
     setSyncing(true); setSyncMsg('')
-    try { const res = await api.ebaySync(); setSyncMsg(`✅ Synced ${res.synced} items`) }
+    try { const res = await api.ebaySync(); setSyncMsg('✅ Synced ' + res.synced + ' items') }
     catch { setSyncMsg('❌ Sync failed') }
     setSyncing(false)
   }
@@ -38,76 +38,60 @@ export default function Settings() {
     const res = await api.createCheckout(); window.location.href = res.url
   }
 
-  async function handlePortal() {
-    const res = await api.openPortal(); window.location.href = res.url
-  }
-
-  const Btn = ({ onClick, label, loading, primary, danger, fullWidth }) => (
-    <button onClick={onClick} disabled={loading} style={{
-      padding: '11px 18px', borderRadius: 10, border: 'none', cursor: loading ? 'wait' : 'pointer',
-      fontSize: 14, fontWeight: 600, width: fullWidth ? '100%' : 'auto',
-      background: primary ? '#3b82f6' : danger ? '#450a0a' : '#334155',
-      color: primary ? '#fff' : danger ? '#ef4444' : '#94a3b8',
-      opacity: loading ? 0.6 : 1
-    }}>{loading ? '...' : label}</button>
+  const Section = ({ title, children }) => (
+    <div style={{ background: '#fff', borderRadius: 16, padding: 20, marginBottom: 16, border: '1px solid #f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 14 }}>{title}</div>
+      {children}
+    </div>
   )
 
   const Row = ({ label, value, valueColor }) => (
-    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f8fafc' }}>
       <span style={{ color: '#64748b', fontSize: 14 }}>{label}</span>
-      <span style={{ color: valueColor || '#f1f5f9', fontSize: 14, fontWeight: 600 }}>{value}</span>
+      <span style={{ color: valueColor || '#1e293b', fontSize: 14, fontWeight: 600 }}>{value}</span>
     </div>
   )
 
-  const Section = ({ title, children }) => (
-    <div style={{ marginBottom: 24 }}>
-      <div style={{ color: '#64748b', fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>{title}</div>
-      <div style={{ background: '#1e293b', borderRadius: 14, padding: 16 }}>{children}</div>
-    </div>
+  const Btn = ({ onClick, label, loading, primary, danger, fullWidth }) => (
+    <button onClick={onClick} disabled={loading} style={{ padding: '12px 18px', borderRadius: 12, border: 'none', cursor: loading ? 'wait' : 'pointer', fontSize: 14, fontWeight: 600, width: fullWidth ? '100%' : 'auto', background: primary ? '#2563eb' : danger ? '#fee2e2' : '#f1f5f9', color: primary ? '#fff' : danger ? '#dc2626' : '#64748b', opacity: loading ? 0.6 : 1, marginTop: 4 }}>
+      {loading ? '...' : label}
+    </button>
   )
 
   return (
-    <div style={{ maxWidth: 480, margin: '0 auto', padding: '24px 16px 80px' }}>
+    <div style={{ maxWidth: 480, margin: '0 auto', padding: '16px 16px 80px' }}>
       <Section title="eBay Account">
         {ebayConnected ? (
-          <div>
-            <Row label="Status" value="Connected ✅" valueColor="#22c55e" />
-            {user?.ebay_user_id && <Row label="Account" value={user.ebay_user_id} />}
-            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+          <>
+            <Row label="Status" value="Connected ✅" valueColor="#16a34a" />
+            {user?.ebay_user_id && <Row label="eBay ID" value={user.ebay_user_id} />}
+            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
               <Btn onClick={handleSync} loading={syncing} label="↻ Sync Now" primary />
               <Btn onClick={handleDisconnect} label="Disconnect" danger />
             </div>
-            {syncMsg && <div style={{ marginTop: 10, fontSize: 13, color: '#94a3b8' }}>{syncMsg}</div>}
-          </div>
+            {syncMsg && <div style={{ marginTop: 10, fontSize: 13, color: '#64748b' }}>{syncMsg}</div>}
+          </>
         ) : (
-          <div>
-            <div style={{ color: '#64748b', fontSize: 14, marginBottom: 16 }}>Connect your eBay account to start tracking feedback.</div>
-            <Btn onClick={handleConnect} label="Connect eBay Account" primary fullWidth />
-          </div>
+          <>
+            <div style={{ color: '#64748b', fontSize: 14, marginBottom: 14 }}>Connect your eBay account to start tracking feedback automatically.</div>
+            <Btn onClick={handleConnect} label="🔗 Connect eBay Account" primary fullWidth />
+          </>
         )}
       </Section>
-
-      <Section title="Plan">
-        <Row label="Current plan" value={isPro ? 'Pro ⭐' : 'Free'} valueColor={isPro ? '#f59e0b' : '#94a3b8'} />
-        {isPro ? (
-          <div style={{ marginTop: 16 }}><Btn onClick={handlePortal} label="Manage Subscription" fullWidth /></div>
-        ) : (
-          <div>
-            <div style={{ color: '#64748b', fontSize: 13, margin: '12px 0' }}>Upgrade for unlimited templates, email alerts, and priority sync.</div>
+      <Section title="Subscription">
+        <Row label="Plan" value={isPro ? 'Pro ⭐' : 'Free'} valueColor={isPro ? '#d97706' : '#94a3b8'} />
+        {!isPro && (
+          <>
+            <div style={{ color: '#64748b', fontSize: 13, margin: '12px 0 8px' }}>Upgrade for unlimited templates and email alerts.</div>
             <Btn onClick={handleUpgrade} label="Upgrade to Pro — $5/mo" primary fullWidth />
-          </div>
+          </>
         )}
       </Section>
-
       <Section title="Profile">
-        <div style={{ marginBottom: 12 }}>
-          <label style={{ color: '#64748b', fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 6 }}>Name</label>
-          <input value={name} onChange={e => setName(e.target.value)} style={{ width: '100%', padding: '10px 14px', background: '#0f172a', border: '1px solid #334155', borderRadius: 10, color: '#f1f5f9', fontSize: 14, boxSizing: 'border-box', outline: 'none' }} />
-        </div>
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ color: '#64748b', fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 6 }}>Email</label>
-          <div style={{ padding: '10px 14px', background: '#0f172a', border: '1px solid #1e293b', borderRadius: 10, color: '#475569', fontSize: 14 }}>{user?.email}</div>
-        </div>
+        <label style={{ color: '#64748b', fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 6 }}>Name</label>
+        <input value={name} onChange={e => setName(e.target.value)} style={{ width: '100%', padding: '10px 14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, color: '#1e293b', fontSize: 14, boxSizing: 'border-box', outline: 'none', marginBottom: 12 }} />
+        <label style={{ color: '#64748b', fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 6 }}>Email</label>
+        <div style={{ padding: '10px 14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, color: '#94a3b8', fontSize: 14, marginBottom: 12 }}>{user?.email}</div>
         <Btn onClick={handleSaveName} loading={saving} label="Save Changes" primary fullWidth />
       </Section>
     </div>

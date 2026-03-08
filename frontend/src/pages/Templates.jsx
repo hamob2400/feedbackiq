@@ -1,134 +1,60 @@
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { api } from '../lib/api'
-import { Plus, Trash2, Pencil, Save, X } from 'lucide-react'
-
-const VARIABLES = ['{buyerName}', '{itemTitle}', '{orderId}', '{sellerName}']
 
 export default function Templates() {
   const [templates, setTemplates] = useState([])
   const [name, setName] = useState('')
-  const [body, setBody] = useState('Hello {buyerName}, thank you for your purchase of {itemTitle}! Please don\'t hesitate to reach out if you have any questions.')
-  const [editing, setEditing] = useState(null)
-  const [error, setError] = useState('')
-  const [saving, setSaving] = useState(false)
+  const [body, setBody] = useState('Hello {buyerName}, thank you for your purchase of {itemTitle}! Please don\'t hesitate to reach out if you need anything.')
+  const [loading, setLoading] = useState(false)
 
-  const load = async () => {
-    try { setTemplates(await api.getTemplates()) } catch { setError('Could not load templates.') }
-  }
   useEffect(() => { load() }, [])
-
-  const save = async () => {
-    if (!name.trim() || !body.trim()) return setError('Name and body are required')
-    setSaving(true)
-    try {
-      if (editing) {
-        const updated = await api.updateTemplate(editing.id, { name, body })
-        setTemplates(prev => prev.map(t => t.id === updated.id ? updated : t))
-        setEditing(null)
-      } else {
-        const t = await api.createTemplate({ name, body })
-        setTemplates(prev => [t, ...prev])
-      }
-      setName('')
-      setBody('Hello {buyerName}, thank you for your purchase of {itemTitle}!')
-      setError('')
-    } catch (e) { setError(e.response?.data?.error || 'Failed to save') }
-    finally { setSaving(false) }
+  async function load() {
+    try { const r = await api.getTemplates(); setTemplates(r.templates || []) } catch {}
   }
 
-  const startEdit = (t) => {
-    setEditing(t)
-    setName(t.name)
-    setBody(t.body)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+  async function handleCreate() {
+    if (!name || !body) return
+    setLoading(true)
+    try { await api.createTemplate({ name, body }); setName(''); await load() }
+    catch (e) { alert(e?.response?.data?.message || 'Failed to create template') }
+    setLoading(false)
   }
 
-  const cancelEdit = () => {
-    setEditing(null)
-    setName('')
-    setBody('')
-  }
-
-  const remove = async (id) => {
+  async function handleDelete(id) {
     if (!confirm('Delete this template?')) return
-    await api.deleteTemplate(id)
-    setTemplates(prev => prev.filter(t => t.id !== id))
+    await api.deleteTemplate(id); await load()
   }
 
-  const insertVar = (v) => setBody(prev => prev + v)
+  const vars = ['{buyerName}', '{itemTitle}', '{orderId}', '{sellerName}']
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
-      <h1 className="text-2xl font-bold">{editing ? 'Edit Template' : 'Response Templates'}</h1>
-
-      <div className="rounded-xl border border-slate-800 bg-slate-900 p-6 space-y-4">
-        <div className="grid md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">Template Name</label>
-            <input
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="e.g. Positive feedback thank you"
-              value={name} onChange={e => setName(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">Insert Variable</label>
-            <div className="flex flex-wrap gap-2">
-              {VARIABLES.map(v => (
-                <button key={v} onClick={() => insertVar(v)}
-                  className="px-2.5 py-1.5 rounded-md bg-slate-800 border border-slate-700 text-xs font-mono text-indigo-400 hover:bg-slate-700 transition">
-                  {v}
-                </button>
-              ))}
-            </div>
-          </div>
+    <div style={{ maxWidth: 480, margin: '0 auto', padding: '16px 16px 80px' }}>
+      <div style={{ background: '#fff', borderRadius: 16, padding: 20, marginBottom: 16, border: '1px solid #f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 14 }}>New Template</div>
+        <label style={{ color: '#64748b', fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 6 }}>Template Name</label>
+        <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Thank you message" style={{ width: '100%', padding: '10px 14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, fontSize: 14, boxSizing: 'border-box', outline: 'none', marginBottom: 12, color: '#1e293b' }} />
+        <label style={{ color: '#64748b', fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 6 }}>Message</label>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
+          {vars.map(v => (
+            <button key={v} onClick={() => setBody(b => b + v)} style={{ padding: '4px 10px', background: '#eff6ff', color: '#2563eb', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{v}</button>
+          ))}
         </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-300 mb-1.5">Message Body</label>
-          <textarea
-            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
-            rows={5} value={body} onChange={e => setBody(e.target.value)}
-          />
-        </div>
-
-        {error && <p className="text-sm text-red-400">{error}</p>}
-
-        <div className="flex gap-2">
-          <button onClick={save} disabled={saving}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold transition disabled:opacity-50">
-            {editing ? <><Save size={15} /> Update</> : <><Plus size={15} /> Create Template</>}
-          </button>
-          {editing && (
-            <button onClick={cancelEdit} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm font-medium transition">
-              <X size={15} /> Cancel
-            </button>
-          )}
-        </div>
+        <textarea value={body} onChange={e => setBody(e.target.value)} rows={5} style={{ width: '100%', padding: '10px 14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, fontSize: 14, boxSizing: 'border-box', outline: 'none', resize: 'vertical', color: '#1e293b', marginBottom: 12 }} />
+        <button onClick={handleCreate} disabled={loading} style={{ width: '100%', padding: '12px', borderRadius: 12, border: 'none', background: '#2563eb', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+          {loading ? '...' : '+ Create Template'}
+        </button>
       </div>
-
-      <div className="grid md:grid-cols-2 gap-4">
-        {templates.map(t => (
-          <div key={t.id} className="rounded-xl border border-slate-800 bg-slate-900 p-5 flex flex-col gap-3">
-            <div className="flex items-start justify-between gap-2">
-              <h3 className="font-semibold text-slate-200">{t.name}</h3>
-              <div className="flex gap-1 shrink-0">
-                <button onClick={() => startEdit(t)} className="p-1.5 rounded-md text-slate-500 hover:text-indigo-400 hover:bg-slate-800 transition"><Pencil size={14} /></button>
-                <button onClick={() => remove(t.id)} className="p-1.5 rounded-md text-slate-500 hover:text-red-400 hover:bg-slate-800 transition"><Trash2 size={14} /></button>
-              </div>
-            </div>
-            <pre className="whitespace-pre-wrap text-sm text-slate-400 font-sans bg-slate-800/50 rounded-lg p-3">{t.body}</pre>
-            <div className="flex flex-wrap gap-1">
-              {VARIABLES.filter(v => t.body.includes(v)).map(v => (
-                <span key={v} className="text-xs px-1.5 py-0.5 rounded bg-indigo-900/40 text-indigo-400 font-mono">{v}</span>
-              ))}
-            </div>
+      {templates.length === 0 ? (
+        <div style={{ textAlign: 'center', color: '#94a3b8', padding: 40, fontSize: 14 }}>No templates yet. Create your first one above.</div>
+      ) : templates.map(t => (
+        <div key={t.id} style={{ background: '#fff', borderRadius: 14, padding: '14px 16px', marginBottom: 10, border: '1px solid #f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <span style={{ fontWeight: 700, fontSize: 14, color: '#1e293b' }}>{t.name}</span>
+            <button onClick={() => handleDelete(t.id)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 18 }}>×</button>
           </div>
-        ))}
-        {templates.length === 0 && (
-          <div className="col-span-2 text-center py-12 text-slate-500 text-sm">No templates yet. Create your first one above.</div>
-        )}
-      </div>
+          <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>{t.body}</div>
+        </div>
+      ))}
     </div>
   )
 }
