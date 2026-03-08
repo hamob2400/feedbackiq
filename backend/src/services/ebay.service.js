@@ -19,7 +19,7 @@ export function getAuthUrl(state) {
 
   const params = new URLSearchParams({
     client_id: config.ebay.clientId,
-    redirect_uri: config.ebay.redirectUri,
+    redirect_uri: config.ebay.ruName,
     response_type: 'code',
     scope: scopes,
     state,
@@ -34,7 +34,7 @@ export async function exchangeCodeForTokens(code) {
     new URLSearchParams({
       grant_type: 'authorization_code',
       code,
-      redirect_uri: config.ebay.redirectUri,
+      redirect_uri: config.ebay.ruName,
     }),
     {
       headers: {
