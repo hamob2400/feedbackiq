@@ -34,3 +34,4 @@ export const config = {
     pass: process.env.SMTP_PASS,
   }
 }
+
