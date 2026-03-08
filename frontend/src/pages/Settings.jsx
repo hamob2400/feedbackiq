@@ -1,157 +1,115 @@
-import { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useState } from 'react'
 import { api } from '../lib/api'
 import { useAuth } from '../lib/AuthContext'
-import { CheckCircle, XCircle, ExternalLink, Zap } from 'lucide-react'
 
 export default function Settings() {
-  const { user, refreshUser } = useAuth()
-  const [searchParams] = useSearchParams()
-  const [name, setName] = useState(user?.name || '')
-  const [password, setPassword] = useState('')
-  const [profileMsg, setProfileMsg] = useState('')
-  const [ebayMsg, setEbayMsg] = useState('')
+  const { user, refresh } = useAuth()
   const [syncing, setSyncing] = useState(false)
-  const [connecting, setConnecting] = useState(false)
+  const [syncMsg, setSyncMsg] = useState('')
+  const [name, setName] = useState(user?.name || '')
+  const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
-    const ebay = searchParams.get('ebay')
-    const sub = searchParams.get('subscription')
-    if (ebay === 'connected') { setEbayMsg('✅ eBay connected successfully!'); refreshUser() }
-    if (ebay === 'error') setEbayMsg('❌ eBay connection failed. Please try again.')
-    if (sub === 'success') { refreshUser() }
-  }, [])
+  const ebayConnected = user?.ebay_connected
+  const isPro = user?.subscription_status === 'active'
 
-  const saveProfile = async () => {
-    try {
-      await api.updateProfile({ name, password: password || undefined })
-      setProfileMsg('Profile updated!')
-      setPassword('')
-      refreshUser()
-    } catch (e) { setProfileMsg(e.response?.data?.error || 'Failed to update') }
+  async function handleSync() {
+    setSyncing(true); setSyncMsg('')
+    try { const res = await api.ebaySync(); setSyncMsg(`✅ Synced ${res.synced} items`) }
+    catch { setSyncMsg('❌ Sync failed') }
+    setSyncing(false)
   }
 
-  const connectEbay = async () => {
-    setConnecting(true)
-    try {
-      const { url } = await api.ebayConnect()
-      window.location.href = url
-    } catch (e) { setEbayMsg(e.response?.data?.error || 'Failed to connect'); setConnecting(false) }
+  async function handleDisconnect() {
+    if (!confirm('Disconnect eBay?')) return
+    await api.ebayDisconnect(); await refresh()
   }
 
-  const disconnectEbay = async () => {
-    if (!confirm('Disconnect eBay? Your synced feedback data will remain.')) return
-    await api.ebayDisconnect()
-    await refreshUser()
-    setEbayMsg('eBay disconnected.')
+  async function handleConnect() {
+    const res = await api.ebayConnect(); window.location.href = res.url
   }
 
-  const syncNow = async () => {
-    setSyncing(true)
-    try {
-      const { synced } = await api.ebaySync()
-      setEbayMsg(`Synced ${synced} feedback entries.`)
-    } catch (e) { setEbayMsg(e.response?.data?.error || 'Sync failed') }
-    finally { setSyncing(false) }
+  async function handleSaveName() {
+    setSaving(true)
+    try { await api.updateProfile({ name }); await refresh() } catch {}
+    setSaving(false)
   }
 
-  const upgradePro = async () => {
-    const { url } = await api.createCheckout()
-    window.location.href = url
+  async function handleUpgrade() {
+    const res = await api.createCheckout(); window.location.href = res.url
   }
 
-  const manageSubscription = async () => {
-    const { url } = await api.openPortal()
-    window.location.href = url
+  async function handlePortal() {
+    const res = await api.openPortal(); window.location.href = res.url
   }
+
+  const Btn = ({ onClick, label, loading, primary, danger, fullWidth }) => (
+    <button onClick={onClick} disabled={loading} style={{
+      padding: '11px 18px', borderRadius: 10, border: 'none', cursor: loading ? 'wait' : 'pointer',
+      fontSize: 14, fontWeight: 600, width: fullWidth ? '100%' : 'auto',
+      background: primary ? '#3b82f6' : danger ? '#450a0a' : '#334155',
+      color: primary ? '#fff' : danger ? '#ef4444' : '#94a3b8',
+      opacity: loading ? 0.6 : 1
+    }}>{loading ? '...' : label}</button>
+  )
+
+  const Row = ({ label, value, valueColor }) => (
+    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
+      <span style={{ color: '#64748b', fontSize: 14 }}>{label}</span>
+      <span style={{ color: valueColor || '#f1f5f9', fontSize: 14, fontWeight: 600 }}>{value}</span>
+    </div>
+  )
+
+  const Section = ({ title, children }) => (
+    <div style={{ marginBottom: 24 }}>
+      <div style={{ color: '#64748b', fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>{title}</div>
+      <div style={{ background: '#1e293b', borderRadius: 14, padding: 16 }}>{children}</div>
+    </div>
+  )
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
-      <h1 className="text-2xl font-bold">Settings</h1>
-
-      {/* Profile */}
-      <section className="rounded-xl border border-slate-800 bg-slate-900 p-6 space-y-4">
-        <h2 className="text-base font-semibold">Profile</h2>
-        <div className="space-y-3">
+    <div style={{ maxWidth: 480, margin: '0 auto', padding: '24px 16px 80px' }}>
+      <Section title="eBay Account">
+        {ebayConnected ? (
           <div>
-            <label className="block text-xs text-slate-400 mb-1.5">Display Name</label>
-            <input className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              value={name} onChange={e => setName(e.target.value)} />
-          </div>
-          <div>
-            <label className="block text-xs text-slate-400 mb-1.5">New Password (leave blank to keep current)</label>
-            <input type="password" className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" />
-          </div>
-        </div>
-        {profileMsg && <p className="text-sm text-indigo-400">{profileMsg}</p>}
-        <button onClick={saveProfile} className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold transition">Save Profile</button>
-      </section>
-
-      {/* eBay */}
-      <section className="rounded-xl border border-slate-800 bg-slate-900 p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold">eBay Integration</h2>
-          {user?.ebay_connected
-            ? <span className="flex items-center gap-1.5 text-xs text-green-400"><CheckCircle size={14} /> Connected as {user.ebay_user_id}</span>
-            : <span className="flex items-center gap-1.5 text-xs text-red-400"><XCircle size={14} /> Not connected</span>}
-        </div>
-        <p className="text-sm text-slate-400">Connect your eBay seller account to automatically sync feedback and analytics.</p>
-        {ebayMsg && <p className="text-sm text-indigo-400">{ebayMsg}</p>}
-        <div className="flex gap-2 flex-wrap">
-          {user?.ebay_connected ? (
-            <>
-              <button onClick={syncNow} disabled={syncing} className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm font-medium transition disabled:opacity-50">
-                {syncing ? 'Syncing…' : 'Sync Now'}
-              </button>
-              <button onClick={disconnectEbay} className="px-4 py-2 rounded-lg bg-red-900/30 hover:bg-red-900/50 text-red-400 text-sm font-medium transition">
-                Disconnect eBay
-              </button>
-            </>
-          ) : (
-            <button onClick={connectEbay} disabled={connecting} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold transition disabled:opacity-50">
-              <ExternalLink size={15} /> {connecting ? 'Redirecting...' : 'Connect eBay Account'}
-            </button>
-          )}
-        </div>
-      </section>
-
-      {/* Subscription */}
-      <section className="rounded-xl border border-slate-800 bg-slate-900 p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold">Subscription</h2>
-          <span className={`text-xs px-2.5 py-1 rounded-full font-semibold uppercase tracking-wide
-            ${user?.subscription_status === 'pro' ? 'bg-indigo-900/50 text-indigo-400' : 'bg-slate-800 text-slate-400'}`}>
-            {user?.subscription_status || 'free'}
-          </span>
-        </div>
-
-        {user?.subscription_status === 'pro' ? (
-          <>
-            <p className="text-sm text-slate-400">You're on the Pro plan. Manage billing, invoices, and cancellation below.</p>
-            {user?.subscription_ends_at && (
-              <p className="text-xs text-slate-500">Next billing date: {new Date(user.subscription_ends_at).toLocaleDateString()}</p>
-            )}
-            <button onClick={manageSubscription} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm font-medium transition">
-              <ExternalLink size={15} /> Manage Billing
-            </button>
-          </>
-        ) : (
-          <>
-            <div className="space-y-2 text-sm text-slate-400">
-              <p className="font-medium text-slate-300">Upgrade to Pro to unlock:</p>
-              <ul className="space-y-1 pl-4">
-                {['Automatic eBay sync every 30 minutes', 'Email alerts for negative feedback', 'Unlimited response templates', 'Full analytics & history', 'Priority support'].map(f => (
-                  <li key={f} className="flex items-center gap-2"><Zap size={13} className="text-indigo-400 shrink-0" />{f}</li>
-                ))}
-              </ul>
+            <Row label="Status" value="Connected ✅" valueColor="#22c55e" />
+            {user?.ebay_user_id && <Row label="Account" value={user.ebay_user_id} />}
+            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+              <Btn onClick={handleSync} loading={syncing} label="↻ Sync Now" primary />
+              <Btn onClick={handleDisconnect} label="Disconnect" danger />
             </div>
-            <button onClick={upgradePro} className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 hover:opacity-90 text-sm font-bold transition">
-              <Zap size={15} /> Upgrade to Pro
-            </button>
-          </>
+            {syncMsg && <div style={{ marginTop: 10, fontSize: 13, color: '#94a3b8' }}>{syncMsg}</div>}
+          </div>
+        ) : (
+          <div>
+            <div style={{ color: '#64748b', fontSize: 14, marginBottom: 16 }}>Connect your eBay account to start tracking feedback.</div>
+            <Btn onClick={handleConnect} label="Connect eBay Account" primary fullWidth />
+          </div>
         )}
-      </section>
+      </Section>
+
+      <Section title="Plan">
+        <Row label="Current plan" value={isPro ? 'Pro ⭐' : 'Free'} valueColor={isPro ? '#f59e0b' : '#94a3b8'} />
+        {isPro ? (
+          <div style={{ marginTop: 16 }}><Btn onClick={handlePortal} label="Manage Subscription" fullWidth /></div>
+        ) : (
+          <div>
+            <div style={{ color: '#64748b', fontSize: 13, margin: '12px 0' }}>Upgrade for unlimited templates, email alerts, and priority sync.</div>
+            <Btn onClick={handleUpgrade} label="Upgrade to Pro — $5/mo" primary fullWidth />
+          </div>
+        )}
+      </Section>
+
+      <Section title="Profile">
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ color: '#64748b', fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 6 }}>Name</label>
+          <input value={name} onChange={e => setName(e.target.value)} style={{ width: '100%', padding: '10px 14px', background: '#0f172a', border: '1px solid #334155', borderRadius: 10, color: '#f1f5f9', fontSize: 14, boxSizing: 'border-box', outline: 'none' }} />
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ color: '#64748b', fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 6 }}>Email</label>
+          <div style={{ padding: '10px 14px', background: '#0f172a', border: '1px solid #1e293b', borderRadius: 10, color: '#475569', fontSize: 14 }}>{user?.email}</div>
+        </div>
+        <Btn onClick={handleSaveName} loading={saving} label="Save Changes" primary fullWidth />
+      </Section>
     </div>
   )
 }
